@@ -54,37 +54,19 @@ Meet tab audio  -> Scribe (their language) -> Claude or free -> ElevenLabs -> yo
 your microphone -> Scribe (your language)  -> Claude or free -> ElevenLabs -> the call, in place of your mic
 ```
 
-| Part | Where it runs | What it does |
-| --- | --- | --- |
-| `src/content/page-hook.js` | Meet's page | Swaps the microphone track on Meet's `RTCRtpSender` for the translation track, mirrors Meet's mute |
-| `src/content/bridge.js` | Content script | Connects the page with the engine, shows the panel and the subtitle bar |
-| `src/content/subtitle-bar.js` | Content script | The subtitles low in the Meet window |
-| `src/offscreen/engine.js` | Offscreen document | Tab capture, microphone, speech recognition, translation, speech, voice clone, recording |
-| `src/offscreen/stt.js` | Offscreen document | Scribe v2 Realtime client: reconnects, keeps audio while reconnecting, recovers a segment the server never commits |
-| `src/shared/turn.js` | Offscreen document | Hears from the sound level when a speaker has finished, so each sentence is closed at once |
-| `src/offscreen/drafts.js` | Offscreen document | Their words so far, translated on this computer while they talk, for the subtitle drafts |
-| `src/offscreen/free-translator.js` | Offscreen document | Free translation: tries free services from the best down |
-| `src/background/service-worker.js` | Service worker | Starts and stops sessions, keeps state for the popup |
-
 ---
 
 ## Free translation
 
-Choose **Free** as the translation model in the settings and no Anthropic key is needed. The extension tries free services from the best quality down and moves to the next one by itself when a service runs out of quota, hits a rate limit, is slow or fails. The page never shows which one translated.
+Choose **Free** as the translation model in the settings and no Anthropic key is needed. The extension tries free services from the best quality down and moves to the next one by itself when a service runs out of quota, hits a rate limit, is slow or fails.
 
 | Order | Service | Free allowance | Needs |
 | --- | --- | --- | --- |
 | 1 | DeepL API Free | 500,000 characters a month | Your free DeepL key |
-| 2 | Mistral (`mistral-medium-latest`) | Free plan with rate limits | Your free Mistral key; turn off training on your data in Mistral's privacy settings |
-| 3 | Groq `openai/gpt-oss-120b` | Daily request and token limits per model | Your free Groq key |
+| 2 | Mistral (`mistral-medium-latest`) | Free plan with rate limits | Your free Mistral key |
+| 3 | Groq `openai/gpt-oss-120b` | Daily request and token limits | Your free Groq key |
 | 4 | Groq `qwen/qwen3.8-27b` | Its own daily limits | The same Groq key |
 | 5 | Chrome's built-in translator | No limit, runs on your computer | Chrome 138 or newer on desktop |
-
-- With no keys at all, Chrome's translator does the work. Its language packs download once, after a click: the settings page has a button for it, and the popup's Start button does it too.
-- Chrome's translator takes everyday meeting talk word for word ("Let's touch base on Monday" came out as "Pazartesi günü üsse dokunalım", "Sesim geliyor mu?" as "Is my voice coming?"), so such phrases are put in plainer words of the same language before it translates (`src/shared/plain.js`, English and Turkish, each rewrite checked through Chrome's translator), and the special terms from the settings come back spelled as written. A free DeepL key still gives much more natural sentences.
-- Keys are optional and belong to each person, because free quotas are per account. A key built into the extension could be copied out of it, and everyone would share one quota.
-- Gemini is left out: on its free tier Google may use what you send to improve its products, and people may read it.
-- Speech recognition and speech still use ElevenLabs, so an ElevenLabs key is always needed.
 
 ---
 
@@ -101,71 +83,20 @@ Choose **Free** as the translation model in the settings and no Anthropic key is
 
 1. Download from the latest release and unzip it.
 2. Open `chrome://extensions`, turn on Developer mode, choose **Load unpacked** and pick the unzipped `meet-interpreter` folder.
-3. The settings page opens by itself. The rest, from the ElevenLabs key to your first call, is in the step-by-step guide with pictures: [SETUP.md](SETUP.md), in Turkish [SETUP.tr.md](SETUP.tr.md).
-
-Keep the folder where it is: Chrome runs the extension from it. To update, replace the folder's contents with the new release and press reload on the extension.
+3. The settings page opens by itself. The rest is in the step-by-step guide: [SETUP.md](SETUP.md) (Turkish: [SETUP.tr.md](SETUP.tr.md)).
 
 ---
 
 ## Run Locally
 
-### Windows
-
-Set up WSL first with this guide: https://x.com/UfukDegen/status/1944066889346429338, then follow the macOS steps inside WSL and load the `dist` folder from `\\wsl$\` in Chrome.
-
-### macOS
-
 ```bash
-git clone https://github.com/UfukNode/meet-interpreter.git
+git clone https://github.com/CuriQusEth/meet-interpreter.git
 cd meet-interpreter
 npm install
 npm run build
 ```
 
-```text
-Built dist/
-```
-
-Open `chrome://extensions`, turn on Developer mode, choose **Load unpacked** and pick the `dist` folder. After pulling changes, run `npm run build` again and press reload on the extension. `npm run zip` builds and packs `dist` into `meet-interpreter.zip`, the file a release carries.
-
----
-
-## Tests
-
-```bash
-npm test            # unit tests: audio, sentences, echo guard, ordering, speech recognition protocol, settings
-npm run test:e2e    # builds, loads the extension into Chromium and drives a mock Meet call
-npm run test:scenarios   # the same mock call through restarts, a reload, failures, settings changes and leaving
-npm run test:api    # live check of every API with latency numbers (keys in .env)
-npm run test:latency     # end of a sentence to its first translated sound, with the real ElevenLabs
-npm run test:free   # live check of DeepL, Mistral and Groq free plans (their keys in .env)
-node test/meet/mock-call-demo.mjs   # both directions with the real ElevenLabs, recorded by the extension
-node test/meet/group-call.mjs       # a four-person call with the real ElevenLabs and Chrome's translator
-```
-
-- The end-to-end test needs no keys: besides the connection checks it runs a full translation round trip against a local stand-in for the ElevenLabs and Anthropic APIs (`test/e2e/mock-api.mjs`, reached through a local proxy). With keys in `.env` it repeats the round trip against the real APIs.
-- The scenario test needs no keys either. The stand-in fails on purpose (a dropped connection, used-up quotas, an overloaded Claude), and the call is restarted, reloaded, switched between modes, changed in the settings, left and closed.
-- Test speech is made with the macOS `say` command and ffmpeg, so the audio tests run on macOS.
-- For a real call there is a debug copy, compiled in only by `npm run build:debug`: with `localStorage['meet-tercuman-debug'] = '<port>'` set on the Meet page and `node test/meet/debug-sink-server.mjs <port>` running, the extension copies the exact audio it sends to speech recognition, the transcripts and the recording to `127.0.0.1`, and the panel shows a DEBUG badge. The normal build ignores the flag.
-
----
-
-## Security
-
-- No backend, no analytics and no remote code: everything ships inside the extension.
-- API keys are kept in `chrome.storage.local` and sent only to the service they belong to: `api.elevenlabs.io`, `api.anthropic.com`, and DeepL, Mistral or Groq when you add their keys.
-- The script inside Meet's page makes no network requests. Audio reaches it through a private `MessagePort`.
-- Nothing reaches the call while Meet shows you as muted, while translation to them is off, or before the call has started.
-- The other person's voice is cloned only after you tick the consent box, and the clone is deleted after the call unless you change that setting.
-- Recordings stay in the extension's storage on your computer until you save or delete them.
-- The panel's controls answer only your own clicks and keys: a script in Meet's page cannot tick the consent box or switch a mode.
-- The debug copy exists only in a debug build (`npm run build:debug`), shows a DEBUG badge while it runs, and only ever sends to `127.0.0.1`.
-
----
-
-## Costs
-
-The panel counts what a call uses and estimates the cost from list prices: Scribe v2 Realtime is $0.39 an hour per active direction, Flash v2.5 and v4 Turbo speech is $0.04 per 1,000 characters, and Claude is billed per token (Haiku 5.5 is the cheapest). Subtitles-only mode makes no speech at all, and free translation costs nothing. A direction turned off listens to nothing, and 30 seconds after the call ends the translation stops by itself.
+Open `chrome://extensions`, turn on Developer mode, choose **Load unpacked** and pick the `dist` folder.
 
 ---
 
