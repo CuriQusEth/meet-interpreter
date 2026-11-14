@@ -99,7 +99,7 @@ Choose **Free** as the translation model in the settings and no Anthropic key is
 
 ## Install
 
-1. Download [meet-interpreter.zip](https://github.com/UfukNode/meet-interpreter/releases/latest/download/meet-interpreter.zip) from the latest release and unzip it.
+1. Download from the latest release and unzip it.
 2. Open `chrome://extensions`, turn on Developer mode, choose **Load unpacked** and pick the unzipped `meet-interpreter` folder.
 3. The settings page opens by itself. The rest, from the ElevenLabs key to your first call, is in the step-by-step guide with pictures: [SETUP.md](SETUP.md), in Turkish [SETUP.tr.md](SETUP.tr.md).
 
